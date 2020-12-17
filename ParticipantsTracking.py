@@ -6,6 +6,10 @@ DB_FILE_NAME = "001_schedule.db"
 MORNING_HOURS = (5, 12)
 AFTERNOON_HOURS = (12, 17)
 EVENING_HOURS = (17, 23)
+MORNING_SESSION = "morning session"
+AFTERNOON_SESSION = "afternoon session"
+EVENING_SESSION = "evening session"
+REMOVE_MS = 1000  # python cannot handle timestamp with milliseconds, so we need to remove them.
 
 
 def convert_unix_time_stamp_to_readable(timestamp):
@@ -56,7 +60,7 @@ class DataBaseData:
         times = self.curr.fetchall()
         sleep_diary = dict()
         for t in times:
-            if t[0] not in sleep_diary and self.times_helper.is_today_timestamp(t[1]/1000):
+            if t[0] not in sleep_diary and self.times_helper.is_today_timestamp(t[1] / REMOVE_MS):
                 sleep_diary[t[0]] = t[2]
         return sleep_diary
 
@@ -64,11 +68,30 @@ class DataBaseData:
         self.curr.execute("SELECT answer_time FROM 'answers' WHERE questionnaire_type=0 AND "
                           "question=2 ORDER BY questionnaire_number desc LIMIT 3")
         times = self.curr.fetchall()
-        times = [t[0]/1000 for t in times]
-        reports_activity = {"morning session": self.times_helper.is_morning_timestamp(times[2]),
-                            "afternoon session": self.times_helper.is_afternoon_timestamp(times[1]),
-                            "evening session": self.times_helper.is_evening_timestamp(times[0])}
+        times = [t[0] / REMOVE_MS for t in times]
+        # 4 sessions?
+        reports_activity = {MORNING_SESSION: self.times_helper.is_morning_timestamp(times[2]),
+                            AFTERNOON_SESSION: self.times_helper.is_afternoon_timestamp(times[1]),
+                            EVENING_SESSION: self.times_helper.is_evening_timestamp(times[0])}
         return reports_activity
+
+    def is_video_recording(self):
+        self.curr.execute("SELECT answer_time FROM 'answers' WHERE questionnaire_type=21 ORDER BY "
+                          "questionnaire_number desc LIMIT 1")
+        time_executed = self.curr.fetchall()[0][0]
+        # corresponds to yesterday?
+        if self.times_helper.is_today_timestamp(time_executed / REMOVE_MS):
+            return True
+        return False
+
+    def get_games_play_report(self):
+        self.curr.execute("SELECT choice_time FROM 'trials' WHERE trial=71 AND stim_time>0 ORDER "
+                          "BY block DESC LIMIT 2")
+        times = self.curr.fetchall()
+        times = [t[0] / REMOVE_MS for t in times]
+        games_report = {MORNING_SESSION: self.times_helper.is_today_timestamp(times[1]),
+                        EVENING_SESSION: self.times_helper.is_today_timestamp(times[0])}
+        return games_report
 
 
 def main():
@@ -76,6 +99,8 @@ def main():
     rows = db.get_mood_reports()
     print(f"mood reports: {rows}")
     print(f"sleep diary: {db.get_sleep_diary_reports()}")
+    print(f"video recorded: {db.is_video_recording()}")
+    print(f"games played: {db.get_games_play_report()}")
 
 
 if __name__ == "__main__":
