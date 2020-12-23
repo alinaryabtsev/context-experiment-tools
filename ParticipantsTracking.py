@@ -113,35 +113,25 @@ class DataBaseData:
     def get_games_play_report(self):
         """
         :return: a dictionary as follows:
-                {"some session" : [(true if first trial executed today,
-                                    time the trial executed,
+                {"some session" : [(time the first trial executed,
                                     time difference between scheduled to executed),
-                                    (true if second trial executed today,
-                                    time the trial executed,
+                                    (time the second trial executed,
                                     time difference between scheduled to executed)] }
         """
         self.curr.execute("SELECT choice_time,scheduled_time FROM 'trials' WHERE trial=71 AND "
-                          "stim_time>0 ORDER BY block DESC LIMIT 4")
+                          "strftime('%Y-%m-%d', datetime(choice_time/1000, 'unixepoch')) = date("
+                          "CURRENT_TIMESTAMP) ORDER BY block DESC LIMIT 4")
         times = self.curr.fetchall()
         times = [[x / REMOVE_MS for x in t] for t in times]
-        games_report = \
-            {MORNING_SESSION: [(self.times_helper.is_today_timestamp(times[3][0]),
-                               self.times_helper.convert_timestamp_to_readable(times[3][0]),
-                               self.times_helper.get_time_diff_of_two_timestamps(times[3][0],
-                                                                                 times[3][1])),
-                               (self.times_helper.is_today_timestamp(times[2][0]),
-                               self.times_helper.convert_timestamp_to_readable(times[2][0]),
-                               self.times_helper.get_time_diff_of_two_timestamps(times[2][0],
-                                                                                 times[2][1]))],
-             EVENING_SESSION: [(self.times_helper.is_today_timestamp(times[1][0]),
-                               self.times_helper.convert_timestamp_to_readable(times[1][0]),
-                               self.times_helper.get_time_diff_of_two_timestamps(times[1][0],
-                                                                                 times[1][1])),
-                               (self.times_helper.is_today_timestamp(times[0][0]),
-                               self.times_helper.convert_timestamp_to_readable(times[0][0]),
-                               self.times_helper.get_time_diff_of_two_timestamps(times[0][0],
-                                                                                 times[0][1]))]}
-        return games_report
+        games_played = {MORNING_SESSION: [], EVENING_SESSION: []}
+        for t in times:
+            ls = (self.times_helper.convert_timestamp_to_readable(t[0]),
+                  self.times_helper.get_time_diff_of_two_timestamps(t[0], t[1]))
+            if self.times_helper.is_morning_timestamp(t[0]):
+                games_played[MORNING_SESSION].append(ls)
+            else:
+                games_played[EVENING_SESSION].append(ls)
+        return games_played
 
 
 def generate_analysis_text(db):
@@ -160,8 +150,8 @@ def main():
     print(f"sleep diary: {db.get_sleep_diary_reports()}")
     print(f"video recorded: {db.is_video_recording()}")
     print(f"games played: {db.get_games_play_report()}")
-    with open(f"analysis_{date.today()}", "w") as output:
-        output.write(generate_analysis_text(db))
+    # with open(f"analysis_{date.today()}", "w") as output:
+    #     output.write(generate_analysis_text(db))
 
 
 if __name__ == "__main__":
