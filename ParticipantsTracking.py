@@ -1,5 +1,5 @@
 from datetime import datetime
-
+from datetime import date
 import time
 import sqlite3
 import os
@@ -144,6 +144,15 @@ class DataBaseData:
         return games_report
 
 
+def generate_analysis_text(db):
+    txt = f"DAILY TRACKING ANALYSIS - {date.today()}\n"
+    mood_reports = db.get_mood_reports()
+    for session, data in mood_reports.items():
+        if data[0]:
+            txt += f"Executed {session} mood report at {data[1]}."
+        else:
+            txt += f"Has not executed {session} mood report."
+
 def main():
     db = DataBaseData(DB_FILE_NAME)
     rows = db.get_mood_reports()
@@ -151,6 +160,8 @@ def main():
     print(f"sleep diary: {db.get_sleep_diary_reports()}")
     print(f"video recorded: {db.is_video_recording()}")
     print(f"games played: {db.get_games_play_report()}")
+    with open(f"analysis_{date.today()}", "w") as output:
+        output.write(generate_analysis_text(db))
 
 
 if __name__ == "__main__":
