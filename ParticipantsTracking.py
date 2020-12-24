@@ -80,24 +80,26 @@ class DataBaseData:
     def get_mood_reports(self):
         """
         :return: returns a dictionary of mood reports activity as follows:
-        {"morning session" : [true if morning session has been completed else false,
-                              timestamp of the last morning session or the last third session
-                              completed]
+        {"morning session" : [timestamp of the last morning session or the last third session
+                              completed or emptystring]
         ... (same with afternoon and evening sessions)
         }
         """
         self.curr.execute("SELECT answer_time FROM 'answers' WHERE questionnaire_type=0 AND "
-                          "question=2 ORDER BY questionnaire_number desc LIMIT 3")
+                          "question=2 AND strftime('%Y-%m-%d', datetime(answer_time/1000, "
+                          "'unixepoch')) = date(CURRENT_TIMESTAMP) ORDER BY "
+                          "questionnaire_number desc LIMIT 3")
         times = self.curr.fetchall()
         times = [t[0] / REMOVE_MS for t in times]
-        reports_activity = \
-            {MORNING_SESSION: [self.times_helper.is_morning_timestamp(times[2]),
-                               self.times_helper.convert_timestamp_to_readable(times[2])],
-             AFTERNOON_SESSION: [self.times_helper.is_afternoon_timestamp(times[1]),
-                                 self.times_helper.convert_timestamp_to_readable(times[1])],
-             EVENING_SESSION: [self.times_helper.is_evening_timestamp(times[0]),
-                               self.times_helper.convert_timestamp_to_readable(times[0])]}
-        return reports_activity
+        reports = {MORNING_SESSION: "", AFTERNOON_SESSION: "", EVENING_SESSION: ""}
+        for t in times:
+            if self.times_helper.is_morning_timestamp(t):
+                reports[MORNING_SESSION] = self.times_helper.convert_timestamp_to_readable(t)
+            if self.times_helper.is_afternoon_timestamp(t):
+                reports[AFTERNOON_SESSION] = self.times_helper.convert_timestamp_to_readable(t)
+            if self.times_helper.is_evening_timestamp(t):
+                reports[EVENING_SESSION] = self.times_helper.convert_timestamp_to_readable(t)
+        return reports
 
     def is_video_recording(self):
         """
@@ -135,23 +137,47 @@ class DataBaseData:
 
 
 def generate_analysis_text(db):
-    txt = f"DAILY TRACKING ANALYSIS - {date.today()}\n"
+    """
+    :param db: the database file to get data from.
+    :return: an output text.
+    """
+    txt = f"DAILY TRACKING ANALYSIS - {date.today()}\n\n"
     mood_reports = db.get_mood_reports()
     for session, data in mood_reports.items():
-        if data[0]:
-            txt += f"Executed {session} mood report at {data[1]}."
+        if data:
+            txt += f"Completed {session} mood report at {data}.\n"
         else:
-            txt += f"Has not executed {session} mood report."
+            txt += f"Has not completed {session} mood report.\n"
+    txt += "\n"
+    sleep_diary = db.get_sleep_diary_reports()
+    if sleep_diary:
+        for action, data in sleep_diary.items():
+            txt += f"{action} at {data}.\n"
+    else:
+        txt += "No sleeping data added.\n"
+    txt += "\n"
+    if db.is_video_recording():
+        txt += "Completed a video recording today.\n"
+    else:
+        txt += "Has not completed a video recording today.\n"
+    txt += "\n"
+    games_played = db.get_games_play_report()
+    for session, data in games_played.items():
+        if data and data[0]:
+            txt += f"Completed game of the {session} at {data[0][0]} with delay of {data[0][1]}.\n"
+            if data[1]:
+                txt += f"Completed second game of the {session} at {data[1][0]} with delay of " \
+                       f"{data[1][1]}.\n"
+            else:
+                txt += f"Has not completed the second game of the {session}.\n"
+        else:
+            txt += f"No games of the {session} has been completed.\n"
+    return txt
 
 def main():
     db = DataBaseData(DB_FILE_NAME)
-    rows = db.get_mood_reports()
-    print(f"mood reports: {rows}")
-    print(f"sleep diary: {db.get_sleep_diary_reports()}")
-    print(f"video recorded: {db.is_video_recording()}")
-    print(f"games played: {db.get_games_play_report()}")
-    # with open(f"analysis_{date.today()}", "w") as output:
-    #     output.write(generate_analysis_text(db))
+    with open(f"analysis_{date.today()}.txt", "w") as output:
+        output.write(generate_analysis_text(db))
 
 
 if __name__ == "__main__":
