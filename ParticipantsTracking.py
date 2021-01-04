@@ -5,7 +5,10 @@ import sqlite3
 import os
 import sys
 
-DB_FILE_NAME = "001_schedule.db"
+DB_FILE_NAME = "1010_schedule_a.db"
+DATA_FROM_TODAY = True  # True if running today's data than it should be true, if data is from
+                        # yesterday than False
+
 MORNING_HOURS = (5, 12)
 AFTERNOON_HOURS = (12, 17)
 EVENING_HOURS = (17, 23)
@@ -17,6 +20,7 @@ SECONDS_IN_A_DAY = 86400
 FELL_ASLEEP = "fell asleep"
 WOKE_UP = "woke up"
 
+
 class TimesHelper:
     def __init__(self):
         self.now = datetime.fromtimestamp(int(time.time()))
@@ -26,7 +30,7 @@ class TimesHelper:
         return datetime.fromtimestamp(int(timestamp)).strftime('%d-%m-%Y %H:%M:%S')
 
     def is_today_timestamp(self, ts):
-        if self.now.date() != datetime.fromtimestamp(ts).date:
+        if self.now.date() != datetime.fromtimestamp(ts).date():
             return False
         return True
 
@@ -164,9 +168,9 @@ def generate_analysis_text(db):
     games_played = db.get_games_play_report()
     for session, data in games_played.items():
         if data and data[0]:
-            txt += f"Completed game of the {session} at {data[0][0]} with delay of {data[0][1]}.\n"
+            txt += f"Completed {session} game at {data[0][0]} with delay of {data[0][1]}.\n"
             if data[1]:
-                txt += f"Completed second game of the {session} at {data[1][0]} with delay of " \
+                txt += f"Completed another {session} game at {data[1][0]} with delay of " \
                        f"{data[1][1]}.\n"
             else:
                 txt += f"Has not completed the second game of the {session}.\n"
