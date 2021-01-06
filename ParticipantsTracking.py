@@ -15,6 +15,7 @@ import os
 DB_FILE_NAME = "1005_schedule.db"  # Put the database file name within the quotation marks
 DATA_FROM_TODAY = False  # Put True if today's data, False if data is from yesterday
 
+
 MORNING_HOURS = (5, 12)
 AFTERNOON_HOURS = (12, 17)
 EVENING_HOURS = (17, 23)
@@ -25,6 +26,7 @@ REMOVE_MS = 1000  # python cannot handle timestamp with milliseconds, so we need
 SECONDS_IN_A_DAY = 86400
 FELL_ASLEEP = "fell asleep"
 WOKE_UP = "woke up"
+
 
 TODAY = "today"
 YESTERDAY = "yesterday"
@@ -233,6 +235,7 @@ def main():
     else:
         with open(f"{DB_FILE_NAME}_analysis_{date.today() -  timedelta(days=1)}.txt", "w") as output:
             output.write(generate_analysis_text(db, YESTERDAY))
+
 
 
 if __name__ == "__main__":
