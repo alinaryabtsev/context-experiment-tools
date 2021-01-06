@@ -1,12 +1,19 @@
+"""
+This is a participant tracking script of the context experiment.
+The only lines that should be changed in order to run this script are lines 15 and 16.
+author - Alina Ryabtsev
+email - alina.ryabtsev@mail.huji.ac.il
+version - 1.0.0"
+"""
+import sys
 from datetime import datetime
 from datetime import date, timedelta
 import time
 import sqlite3
 import os
-import sys
 
-DB_FILE_NAME = "1005_schedule.db"
-DATA_FROM_TODAY = False  # True if today's data, if data is from yesterday than False
+DB_FILE_NAME = "1005_schedule.db"  # Put the database file name within the quotation marks
+DATA_FROM_TODAY = False  # Put True if today's data, False if data is from yesterday
 
 MORNING_HOURS = (5, 12)
 AFTERNOON_HOURS = (12, 17)
@@ -214,7 +221,7 @@ def generate_analysis_text(db, data_from=TODAY):
             else:
                 txt += f"Has not completed the second game of the {session}.\n"
         else:
-            txt += f"No games of the {session} has been completed.\n"
+            txt += f"No games of the {session} have been completed.\n"
     return txt
 
 
