@@ -1,13 +1,12 @@
 from datetime import datetime
-from datetime import date
+from datetime import date, timedelta
 import time
 import sqlite3
 import os
 import sys
 
-DB_FILE_NAME = "1010_schedule_a.db"
-DATA_FROM_TODAY = True  # True if running today's data than it should be true, if data is from
-                        # yesterday than False
+DB_FILE_NAME = "1010_schedule.db"
+DATA_FROM_TODAY = False  # True if today's data, if data is from yesterday than False
 
 MORNING_HOURS = (5, 12)
 AFTERNOON_HOURS = (12, 17)
@@ -19,6 +18,42 @@ REMOVE_MS = 1000  # python cannot handle timestamp with milliseconds, so we need
 SECONDS_IN_A_DAY = 86400
 FELL_ASLEEP = "fell asleep"
 WOKE_UP = "woke up"
+
+TODAY = "today"
+YESTERDAY = "yesterday"
+
+SQL_QUERY_SLEEP_DIARY = {
+    TODAY:     "SELECT event,time,date FROM 'sleep' Order By time DESC LIMIT 2",
+    YESTERDAY: "SELECT event,time,date FROM 'sleep' WHERE strftime('%Y-%m-%d', datetime(time/1000, "
+               "'unixepoch')) = date('now','-1 days') Order By time DESC LIMIT 2"
+}
+
+SQL_QUERY_MOOD_REPORT = {
+    TODAY:     "SELECT answer_time FROM 'answers' WHERE questionnaire_type=0 AND question=2 AND "
+               "strftime('%Y-%m-%d', datetime(answer_time/1000, 'unixepoch')) = "
+               "date(CURRENT_TIMESTAMP) ORDER BY questionnaire_number desc LIMIT 3",
+    YESTERDAY: "SELECT answer_time FROM 'answers' WHERE questionnaire_type=0 AND question=2 AND "
+               "strftime('%Y-%m-%d', datetime(answer_time/1000, 'unixepoch')) = "
+               "date('now','-1 days') ORDER BY questionnaire_number desc LIMIT 3"
+}
+
+SQL_QUERY_VIDEO_RECORDING = {
+    TODAY:     "SELECT answer_time FROM 'answers' WHERE questionnaire_type=21 ORDER BY "
+               "questionnaire_number desc LIMIT 1",
+    YESTERDAY: "SELECT * FROM 'answers' WHERE questionnaire_type=21 and strftime('%Y-%m-%d', "
+               "datetime(answer_time/1000, 'unixepoch')) = date('now','-1 days') ORDER BY "
+               "questionnaire_number desc LIMIT 1"
+}
+
+SQL_QUERY_GAMES = {
+    TODAY:     "SELECT choice_time,scheduled_time FROM 'trials' WHERE trial=71 AND "
+               "strftime('%Y-%m-%d', datetime(choice_time/1000, 'unixepoch')) = date("
+               "CURRENT_TIMESTAMP) ORDER BY block DESC LIMIT 4",
+    YESTERDAY: "SELECT choice_time,scheduled_time FROM 'trials' WHERE trial=71 AND "
+               "strftime('%Y-%m-%d', datetime(choice_time/1000, 'unixepoch')) = "
+               "date('now','-1 days') ORDER BY block DESC LIMIT 4"
+}
+
 
 
 class TimesHelper:
@@ -67,13 +102,13 @@ class DataBaseData:
         self.curr = self.conn.cursor()
         self.times_helper = TimesHelper()
 
-    def get_sleep_diary_reports(self):
+    def get_sleep_diary_reports(self, to_check=TODAY):
         """
         :return: if sleep diary reports filled right, then should return a dictionary
                     {"woke up" : date, "fell asleep" : date}
                 else it will return an empty dictionary
         """
-        self.curr.execute("SELECT event,time,date FROM 'sleep' Order By time DESC LIMIT 2")
+        self.curr.execute(SQL_QUERY_SLEEP_DIARY[to_check])
         times = self.curr.fetchall()
         sleep_diary = dict()
         for t in times:
@@ -81,7 +116,7 @@ class DataBaseData:
                 sleep_diary[t[0]] = t[2]
         return sleep_diary
 
-    def get_mood_reports(self):
+    def get_mood_reports(self, to_check=TODAY):
         """
         :return: returns a dictionary of mood reports activity as follows:
         {"morning session" : [timestamp of the last morning session or the last third session
@@ -89,10 +124,7 @@ class DataBaseData:
         ... (same with afternoon and evening sessions)
         }
         """
-        self.curr.execute("SELECT answer_time FROM 'answers' WHERE questionnaire_type=0 AND "
-                          "question=2 AND strftime('%Y-%m-%d', datetime(answer_time/1000, "
-                          "'unixepoch')) = date(CURRENT_TIMESTAMP) ORDER BY "
-                          "questionnaire_number desc LIMIT 3")
+        self.curr.execute(SQL_QUERY_MOOD_REPORT[to_check])
         times = self.curr.fetchall()
         times = [t[0] / REMOVE_MS for t in times]
         reports = {MORNING_SESSION: "", AFTERNOON_SESSION: "", EVENING_SESSION: ""}
@@ -105,18 +137,17 @@ class DataBaseData:
                 reports[EVENING_SESSION] = self.times_helper.convert_timestamp_to_readable(t)
         return reports
 
-    def is_video_recording(self):
+    def has_recorded_video_recording(self, to_check=TODAY):
         """
         :return: true if today's video has been recorded.
         """
-        self.curr.execute("SELECT answer_time FROM 'answers' WHERE questionnaire_type=21 ORDER BY "
-                          "questionnaire_number desc LIMIT 1")
+        self.curr.execute(SQL_QUERY_VIDEO_RECORDING[to_check])
         time_executed = self.curr.fetchall()[0][0]
         if self.times_helper.is_today_timestamp(time_executed / REMOVE_MS):
             return True
         return False
 
-    def get_games_play_report(self):
+    def get_games_play_report(self, to_check=TODAY):
         """
         :return: a dictionary as follows:
                 {"some session" : [(time the first trial executed,
@@ -124,9 +155,7 @@ class DataBaseData:
                                     (time the second trial executed,
                                     time difference between scheduled to executed)] }
         """
-        self.curr.execute("SELECT choice_time,scheduled_time FROM 'trials' WHERE trial=71 AND "
-                          "strftime('%Y-%m-%d', datetime(choice_time/1000, 'unixepoch')) = date("
-                          "CURRENT_TIMESTAMP) ORDER BY block DESC LIMIT 4")
+        self.curr.execute(SQL_QUERY_GAMES[to_check])
         times = self.curr.fetchall()
         times = [[x / REMOVE_MS for x in t] for t in times]
         games_played = {MORNING_SESSION: [], EVENING_SESSION: []}
@@ -140,37 +169,42 @@ class DataBaseData:
         return games_played
 
 
-def generate_analysis_text(db):
+def generate_analysis_text(db, data_from=TODAY):
     """
+    :param data_from: a string which represents if the data is from today ("today") or from
+    yesterday ("yesterday")
     :param db: the database file to get data from.
     :return: an output text.
     """
-    txt = f"DAILY TRACKING ANALYSIS - {date.today()}\n\n"
-    mood_reports = db.get_mood_reports()
+    if data_from == TODAY:
+        txt = f"DAILY TRACKING ANALYSIS - {date.today()}\n\n"
+    else:
+        txt = f"DAILY TRACKING ANALYSIS - {date.today() -  timedelta(days=1)}\n\n"
+    mood_reports = db.get_mood_reports(data_from)
+    sleep_diary = db.get_sleep_diary_reports(data_from)
+    games_played = db.get_games_play_report(data_from)
     for session, data in mood_reports.items():
         if data:
             txt += f"Completed {session} mood report at {data}.\n"
         else:
             txt += f"Has not completed {session} mood report.\n"
     txt += "\n"
-    sleep_diary = db.get_sleep_diary_reports()
     if sleep_diary:
         for action, data in sleep_diary.items():
             txt += f"{action} at {data}.\n"
     else:
         txt += "No sleeping data added.\n"
     txt += "\n"
-    if db.is_video_recording():
-        txt += "Completed a video recording today.\n"
+    if db.has_recorded_video_recording(data_from):
+        txt += "Has completed a video recording.\n"
     else:
-        txt += "Has not completed a video recording today.\n"
+        txt += "Has not completed a video recording.\n"
     txt += "\n"
-    games_played = db.get_games_play_report()
     for session, data in games_played.items():
         if data and data[0]:
-            txt += f"Completed {session} game at {data[0][0]} with delay of {data[0][1]}.\n"
+            txt += f"Has completed {session} game at {data[0][0]} with delay of {data[0][1]}.\n"
             if data[1]:
-                txt += f"Completed another {session} game at {data[1][0]} with delay of " \
+                txt += f"Has completed another {session} game at {data[1][0]} with delay of " \
                        f"{data[1][1]}.\n"
             else:
                 txt += f"Has not completed the second game of the {session}.\n"
@@ -180,8 +214,12 @@ def generate_analysis_text(db):
 
 def main():
     db = DataBaseData(DB_FILE_NAME)
-    with open(f"analysis_{date.today()}.txt", "w") as output:
-        output.write(generate_analysis_text(db))
+    if DATA_FROM_TODAY:
+        with open(f"analysis_{date.today()}.txt", "w") as output:
+            output.write(generate_analysis_text(db, TODAY))
+    else:
+        with open(f"analysis_{date.today() -  timedelta(days=1)}.txt", "w") as output:
+            output.write(generate_analysis_text(db, YESTERDAY))
 
 
 if __name__ == "__main__":
