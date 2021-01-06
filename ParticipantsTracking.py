@@ -5,8 +5,8 @@ import sqlite3
 import os
 import sys
 
-DB_FILE_NAME = "1010_schedule.db"
-DATA_FROM_TODAY = False  # True if today's data, if data is from yesterday than False
+DB_FILE_NAME = "1005_schedule.db"
+DATA_FROM_TODAY = True  # True if today's data, if data is from yesterday than False
 
 MORNING_HOURS = (5, 12)
 AFTERNOON_HOURS = (12, 17)
@@ -23,7 +23,9 @@ TODAY = "today"
 YESTERDAY = "yesterday"
 
 SQL_QUERY_SLEEP_DIARY = {
-    TODAY:     "SELECT event,time,date FROM 'sleep' Order By time DESC LIMIT 2",
+    TODAY:     "SELECT event,time,date FROM 'sleep' WHERE strftime('%Y-%m-%d', "
+               "datetime(time/1000, 'unixepoch')) = date(CURRENT_TIMESTAMP) "
+               "Order By time DESC LIMIT 2",
     YESTERDAY: "SELECT event,time,date FROM 'sleep' WHERE strftime('%Y-%m-%d', datetime(time/1000, "
                "'unixepoch')) = date('now','-1 days') Order By time DESC LIMIT 2"
 }
@@ -38,9 +40,10 @@ SQL_QUERY_MOOD_REPORT = {
 }
 
 SQL_QUERY_VIDEO_RECORDING = {
-    TODAY:     "SELECT answer_time FROM 'answers' WHERE questionnaire_type=21 ORDER BY "
-               "questionnaire_number desc LIMIT 1",
-    YESTERDAY: "SELECT * FROM 'answers' WHERE questionnaire_type=21 and strftime('%Y-%m-%d', "
+    TODAY:     "SELECT answer_time FROM 'answers' WHERE questionnaire_type=21 AND "
+               "strftime('%Y-%m-%d', datetime(answer_time/1000, 'unixepoch')) = "
+               "date(CURRENT_TIMESTAMP) ORDER BY questionnaire_number desc LIMIT 1",
+    YESTERDAY: "SELECT * FROM 'answers' WHERE questionnaire_type=21 AND strftime('%Y-%m-%d', "
                "datetime(answer_time/1000, 'unixepoch')) = date('now','-1 days') ORDER BY "
                "questionnaire_number desc LIMIT 1"
 }
@@ -53,7 +56,6 @@ SQL_QUERY_GAMES = {
                "strftime('%Y-%m-%d', datetime(choice_time/1000, 'unixepoch')) = "
                "date('now','-1 days') ORDER BY block DESC LIMIT 4"
 }
-
 
 
 class TimesHelper:
@@ -69,21 +71,24 @@ class TimesHelper:
             return False
         return True
 
-    def is_morning_timestamp(self, ts):
+    @staticmethod
+    def is_morning_timestamp(ts):
         hour = datetime.fromtimestamp(ts).hour
-        if self.is_today_timestamp(ts) and MORNING_HOURS[0] < hour < MORNING_HOURS[1]:
+        if MORNING_HOURS[0] < hour < MORNING_HOURS[1]:
             return True
         return False
 
-    def is_afternoon_timestamp(self, ts):
+    @staticmethod
+    def is_afternoon_timestamp(ts):
         hour = datetime.fromtimestamp(ts).hour
-        if self.is_today_timestamp(ts) and AFTERNOON_HOURS[0] <= hour <= AFTERNOON_HOURS[1]:
+        if AFTERNOON_HOURS[0] <= hour <= AFTERNOON_HOURS[1]:
             return True
         return False
 
-    def is_evening_timestamp(self, ts):
+    @staticmethod
+    def is_evening_timestamp(ts):
         hour = datetime.fromtimestamp(ts).hour
-        if self.is_today_timestamp(ts) and EVENING_HOURS[0] <= hour <= EVENING_HOURS[1]:
+        if EVENING_HOURS[0] <= hour <= EVENING_HOURS[1]:
             return True
         return False
 
@@ -112,7 +117,7 @@ class DataBaseData:
         times = self.curr.fetchall()
         sleep_diary = dict()
         for t in times:
-            if t[0] not in sleep_diary and self.times_helper.is_today_timestamp(t[1] / REMOVE_MS):
+            if t[0] not in sleep_diary:
                 sleep_diary[t[0]] = t[2]
         return sleep_diary
 
@@ -142,8 +147,8 @@ class DataBaseData:
         :return: true if today's video has been recorded.
         """
         self.curr.execute(SQL_QUERY_VIDEO_RECORDING[to_check])
-        time_executed = self.curr.fetchall()[0][0]
-        if self.times_helper.is_today_timestamp(time_executed / REMOVE_MS):
+        time_executed = self.curr.fetchall()
+        if time_executed:
             return True
         return False
 
@@ -212,13 +217,14 @@ def generate_analysis_text(db, data_from=TODAY):
             txt += f"No games of the {session} has been completed.\n"
     return txt
 
+
 def main():
     db = DataBaseData(DB_FILE_NAME)
     if DATA_FROM_TODAY:
-        with open(f"analysis_{date.today()}.txt", "w") as output:
+        with open(f"{DB_FILE_NAME}_analysis_{date.today()}.txt", "w") as output:
             output.write(generate_analysis_text(db, TODAY))
     else:
-        with open(f"analysis_{date.today() -  timedelta(days=1)}.txt", "w") as output:
+        with open(f"{DB_FILE_NAME}_analysis_{date.today() -  timedelta(days=1)}.txt", "w") as output:
             output.write(generate_analysis_text(db, YESTERDAY))
 
 
