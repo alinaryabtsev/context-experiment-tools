@@ -6,7 +6,7 @@ import os
 import sys
 
 DB_FILE_NAME = "1005_schedule.db"
-DATA_FROM_TODAY = True  # True if today's data, if data is from yesterday than False
+DATA_FROM_TODAY = False  # True if today's data, if data is from yesterday than False
 
 MORNING_HOURS = (5, 12)
 AFTERNOON_HOURS = (12, 17)
@@ -33,10 +33,10 @@ SQL_QUERY_SLEEP_DIARY = {
 SQL_QUERY_MOOD_REPORT = {
     TODAY:     "SELECT answer_time FROM 'answers' WHERE questionnaire_type=0 AND question=2 AND "
                "strftime('%Y-%m-%d', datetime(answer_time/1000, 'unixepoch')) = "
-               "date(CURRENT_TIMESTAMP) ORDER BY questionnaire_number desc LIMIT 3",
+               "date(CURRENT_TIMESTAMP) ORDER BY questionnaire_number asc LIMIT 3",
     YESTERDAY: "SELECT answer_time FROM 'answers' WHERE questionnaire_type=0 AND question=2 AND "
                "strftime('%Y-%m-%d', datetime(answer_time/1000, 'unixepoch')) = "
-               "date('now','-1 days') ORDER BY questionnaire_number desc LIMIT 3"
+               "date('now','-1 days') ORDER BY questionnaire_number asc LIMIT 3"
 }
 
 SQL_QUERY_VIDEO_RECORDING = {
