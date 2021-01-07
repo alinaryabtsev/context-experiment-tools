@@ -12,7 +12,7 @@ import time
 import sqlite3
 import os
 
-DB_FILE_NAME = "1005_schedule.db"  # Put the database file name within the quotation marks
+DB_FILE_NAME = "1012_schedule.db"  # Put the database file name within the quotation marks
 DATA_FROM_TODAY = False  # Put True if today's data, False if data is from yesterday
 
 
@@ -215,9 +215,9 @@ def generate_analysis_text(db, data_from=TODAY):
         txt += "Has not completed a video recording.\n"
     txt += "\n"
     for session, data in games_played.items():
-        if data and data[0]:
+        if data and len(data) >= 1:
             txt += f"Has completed {session} game at {data[0][0]} with delay of {data[0][1]}.\n"
-            if data[1]:
+            if len(data) == 2:
                 txt += f"Has completed another {session} game at {data[1][0]} with delay of " \
                        f"{data[1][1]}.\n"
             else:
@@ -235,7 +235,6 @@ def main():
     else:
         with open(f"{DB_FILE_NAME}_analysis_{date.today() -  timedelta(days=1)}.txt", "w") as output:
             output.write(generate_analysis_text(db, YESTERDAY))
-
 
 
 if __name__ == "__main__":
