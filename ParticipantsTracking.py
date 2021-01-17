@@ -16,9 +16,9 @@ DB_FILE_NAME = "1005_schedule.db"  # Put the database file name within the quota
 DATA_FROM_TODAY = False  # Put True if today's data, False if data is from yesterday
 
 
-MORNING_HOURS = (5, 12)
+MORNING_HOURS = (5, 11)
 AFTERNOON_HOURS = (12, 17)
-EVENING_HOURS = (17, 23)
+EVENING_HOURS = (18, 23)
 MORNING_SESSION = "morning session"
 AFTERNOON_SESSION = "afternoon session"
 EVENING_SESSION = "evening session"
