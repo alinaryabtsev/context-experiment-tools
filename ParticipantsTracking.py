@@ -12,7 +12,7 @@ import time
 import sqlite3
 import os
 
-DB_FILE_NAME = "1012_schedule.db"  # Put the database file name within the quotation marks
+DB_FILE_NAME = "1005_schedule.db"  # Put the database file name within the quotation marks
 DATA_FROM_TODAY = False  # Put True if today's data, False if data is from yesterday
 
 
@@ -191,9 +191,9 @@ def generate_analysis_text(db, data_from=TODAY):
     :return: an output text.
     """
     if data_from == TODAY:
-        txt = f"DAILY TRACKING ANALYSIS - {date.today()}\n\n"
+        txt = f"DAILY TRACKING ANALYSIS - {datetime.utcnow().date()}\n\n"
     else:
-        txt = f"DAILY TRACKING ANALYSIS - {date.today() -  timedelta(days=1)}\n\n"
+        txt = f"DAILY TRACKING ANALYSIS - {datetime.utcnow().date() - timedelta(days=1)}\n\n"
     mood_reports = db.get_mood_reports(data_from)
     sleep_diary = db.get_sleep_diary_reports(data_from)
     games_played = db.get_games_play_report(data_from)
@@ -228,12 +228,18 @@ def generate_analysis_text(db, data_from=TODAY):
 
 
 def main():
+    """
+    Opens a file to write in the results of monitoring according to current UTC time (since the
+    timestamps of the data are in UTC time format.
+    :return:
+    """
     db = DataBaseData(DB_FILE_NAME)
     if DATA_FROM_TODAY:
-        with open(f"{DB_FILE_NAME}_analysis_{date.today()}.txt", "w") as output:
+        with open(f"{DB_FILE_NAME}_analysis_{datetime.utcnow().date()}.txt", "w") as output:
             output.write(generate_analysis_text(db, TODAY))
     else:
-        with open(f"{DB_FILE_NAME}_analysis_{date.today() -  timedelta(days=1)}.txt", "w") as output:
+        with open(f"{DB_FILE_NAME}_analysis_{datetime.utcnow().date() - timedelta(days=1)}.txt",
+                  "w") as output:
             output.write(generate_analysis_text(db, YESTERDAY))
 
 
