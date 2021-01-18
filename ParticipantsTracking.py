@@ -83,7 +83,7 @@ class TimesHelper:
     @staticmethod
     def is_morning_timestamp(ts):
         hour = datetime.fromtimestamp(ts).hour
-        if MORNING_HOURS[0] < hour < MORNING_HOURS[1]:
+        if MORNING_HOURS[0] <= hour <= MORNING_HOURS[1]:
             return True
         return False
 
