@@ -1,13 +1,13 @@
 """
-This is a participant tracking script of the context experiment.
+This is a participant tracking script of the context reward experiment.
 The only lines that should be changed in order to run this script are lines 15 and 16.
 author - Alina Ryabtsev
 email - alina.ryabtsev@mail.huji.ac.il
-version - 1.0.0"
+version - 1.0.1"
 """
 import sys
 from datetime import datetime
-from datetime import date, timedelta
+from datetime import timedelta
 import time
 import sqlite3
 import os
