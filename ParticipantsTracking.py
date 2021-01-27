@@ -22,6 +22,7 @@ EVENING_HOURS = (18, 23)
 MORNING_SESSION = "morning session"
 AFTERNOON_SESSION = "afternoon session"
 EVENING_SESSION = "evening session"
+NO_SESSION = "no session"
 REMOVE_MS = 1000  # python cannot handle timestamp with milliseconds, so we need to remove them.
 SECONDS_IN_A_DAY = 86400
 FELL_ASLEEP = "fell asleep"
@@ -108,6 +109,10 @@ class TimesHelper:
 
 class DataBaseData:
     def __init__(self, file_path):
+        """
+        Initializes data base reader object
+        :param file_path:
+        """
         if file_path not in os.listdir(os.getcwd()):
             print(f"No database file have been found. Please make sure the data base file is "
                   f"named as {file_path} and can be found where the script is.")
@@ -135,20 +140,23 @@ class DataBaseData:
         :return: returns a dictionary of mood reports activity as follows:
         {"morning session" : [timestamp of the last morning session or the last third session
                               completed or emptystring]
-        ... (same with afternoon and evening sessions)
+        ... (same with afternoon and evening sessions. If executed in another time - will be
+        attached to no session tag)
         }
         """
         self.curr.execute(SQL_QUERY_MOOD_REPORT[to_check])
         times = self.curr.fetchall()
         times = [t[0] / REMOVE_MS for t in times]
-        reports = {MORNING_SESSION: "", AFTERNOON_SESSION: "", EVENING_SESSION: ""}
+        reports = {MORNING_SESSION: "", AFTERNOON_SESSION: "", EVENING_SESSION: "", NO_SESSION: ""}
         for t in times:
-            if self.times_helper.is_morning_timestamp(t):
+            if self.times_helper.is_morning_timestamp(t) and not reports[MORNING_SESSION]:
                 reports[MORNING_SESSION] = self.times_helper.convert_timestamp_to_readable(t)
-            if self.times_helper.is_afternoon_timestamp(t):
+            elif self.times_helper.is_afternoon_timestamp(t) and not reports[AFTERNOON_SESSION]:
                 reports[AFTERNOON_SESSION] = self.times_helper.convert_timestamp_to_readable(t)
-            if self.times_helper.is_evening_timestamp(t):
+            elif self.times_helper.is_evening_timestamp(t) and not reports[EVENING_SESSION]:
                 reports[EVENING_SESSION] = self.times_helper.convert_timestamp_to_readable(t)
+            else:
+                reports[NO_SESSION] = self.times_helper.convert_timestamp_to_readable(t)
         return reports
 
     def has_recorded_video_recording(self, to_check=TODAY):
@@ -172,14 +180,16 @@ class DataBaseData:
         self.curr.execute(SQL_QUERY_GAMES[to_check])
         times = self.curr.fetchall()
         times = [[x / REMOVE_MS for x in t] for t in times]
-        games_played = {MORNING_SESSION: [], EVENING_SESSION: []}
+        games_played = {MORNING_SESSION: [], EVENING_SESSION: [], NO_SESSION: []}
         for t in times:
             ls = (self.times_helper.convert_timestamp_to_readable(t[0]),
                   self.times_helper.get_time_diff_of_two_timestamps(t[0], t[1]))
             if self.times_helper.is_morning_timestamp(t[0]):
                 games_played[MORNING_SESSION].append(ls)
-            else:
+            elif self.times_helper.is_evening_timestamp(t[0]):
                 games_played[EVENING_SESSION].append(ls)
+            else:
+                games_played[NO_SESSION].append(ls)
         return games_played
 
 
@@ -198,7 +208,10 @@ def generate_analysis_text(db, data_from=TODAY):
     sleep_diary = db.get_sleep_diary_reports(data_from)
     games_played = db.get_games_play_report(data_from)
     for session, data in mood_reports.items():
-        if data:
+        if session == NO_SESSION:
+            if data:
+                txt += f"Some session completed at {data}, but not in scheduled time.\n"
+        elif data:
             txt += f"Completed {session} mood report at {data}.\n"
         else:
             txt += f"Has not completed {session} mood report.\n"
@@ -215,7 +228,12 @@ def generate_analysis_text(db, data_from=TODAY):
         txt += "Has not completed a video recording.\n"
     txt += "\n"
     for session, data in games_played.items():
-        if data and len(data) >= 1:
+        if session == NO_SESSION:
+            if len(data) >= 1:
+                for i in range(len(data)):
+                    txt += f"Has completed a game but not in time, at {data[i][0]} with delay of " \
+                           f"{data[i][1]}.\n"
+        elif data and len(data) >= 1:
             txt += f"Has completed {session} game at {data[0][0]} with delay of {data[0][1]}.\n"
             if len(data) == 2:
                 txt += f"Has completed another {session} game at {data[1][0]} with delay of " \
