@@ -189,6 +189,7 @@ class DataBaseData:
                 games_played[MORNING_SESSION].append(ls)
             elif self.times_helper.is_evening_timestamp(t[0]) and \
                     len(games_played[EVENING_SESSION]) < 2:
+                games_played[EVENING_SESSION].append(ls)
             else:
                 games_played[NO_SESSION].append(ls)
         return games_played
