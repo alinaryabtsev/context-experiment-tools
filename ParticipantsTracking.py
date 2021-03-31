@@ -3,7 +3,7 @@ This is a participant tracking script of the context reward experiment.
 The only lines that should be changed in order to run this script are lines 15 and 16.
 author - Alina Ryabtsev
 email - alina.ryabtsev@mail.huji.ac.il
-version - 1.0.1"
+version - 1.0.2"
 """
 import sys
 from datetime import datetime
@@ -12,7 +12,7 @@ import time
 import sqlite3
 import os
 
-DB_FILE_NAME = "1005_schedule.db"  # Put the database file name within the quotation marks
+DB_FILE_NAME = "1006_schedule.db"  # Put the database file name within the quotation marks
 DATA_FROM_TODAY = False  # Put True if today's data, False if data is from yesterday
 
 
@@ -184,10 +184,11 @@ class DataBaseData:
         for t in times:
             ls = (self.times_helper.convert_timestamp_to_readable(t[0]),
                   self.times_helper.get_time_diff_of_two_timestamps(t[0], t[1]))
-            if self.times_helper.is_morning_timestamp(t[0]):
+            if self.times_helper.is_morning_timestamp(t[0]) and \
+                    len(games_played[MORNING_SESSION]) < 2:
                 games_played[MORNING_SESSION].append(ls)
-            elif self.times_helper.is_evening_timestamp(t[0]):
-                games_played[EVENING_SESSION].append(ls)
+            elif self.times_helper.is_evening_timestamp(t[0]) and \
+                    len(games_played[EVENING_SESSION]) < 2:
             else:
                 games_played[NO_SESSION].append(ls)
         return games_played
@@ -235,7 +236,7 @@ def generate_analysis_text(db, data_from=TODAY):
                            f"{data[i][1]}.\n"
         elif data and len(data) >= 1:
             txt += f"Has completed {session} game at {data[0][0]} with delay of {data[0][1]}.\n"
-            if len(data) == 2:
+            if len(data) >= 2:
                 txt += f"Has completed another {session} game at {data[1][0]} with delay of " \
                        f"{data[1][1]}.\n"
             else:
