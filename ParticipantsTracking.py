@@ -1,9 +1,9 @@
 """
 This is a participant tracking script of the context reward experiment.
-The only lines that should be changed in order to run this script are lines 15 and 16.
+The only lines that should be changed in order to run this script are lines 15 and 16 and maybe 17.
 author - Alina Ryabtsev
 email - alina.ryabtsev@mail.huji.ac.il
-version - 1.0.2"
+version - 1.0.3"
 """
 import sys
 from datetime import datetime
@@ -12,10 +12,11 @@ import time
 import sqlite3
 import os
 
-DB_FILE_NAME = "1006_schedule.db"  # Put the database file name within the quotation marks
+DB_FILE_NAME = "2013_schedule.db"  # Put the database file name within the quotation marks
 DATA_FROM_TODAY = False  # Put True if today's data, False if data is from yesterday
+DAYS_DELTA = 10  # number of prior days to take data from
 
-
+MAX_EXPERIMENT_DAYS = 12
 MORNING_HOURS = (5, 11)
 AFTERNOON_HOURS = (12, 17)
 EVENING_HOURS = (18, 23)
@@ -36,39 +37,43 @@ SQL_QUERY_SLEEP_DIARY = {
     TODAY:     "SELECT event,time,date FROM 'sleep' WHERE strftime('%Y-%m-%d', "
                "datetime(time/1000, 'unixepoch')) = date(CURRENT_TIMESTAMP) "
                "Order By time DESC LIMIT 2",
-    YESTERDAY: "SELECT event,time,date FROM 'sleep' WHERE strftime('%Y-%m-%d', datetime(time/1000, "
-               "'unixepoch')) = date('now','-1 days') Order By time DESC LIMIT 2"
+    YESTERDAY: f"SELECT event,time,date FROM 'sleep' WHERE strftime('%Y-%m-%d', datetime(time/1000,"
+               f" 'unixepoch')) = date('now','-{DAYS_DELTA} days') Order By time DESC LIMIT 2"
 }
 
 SQL_QUERY_MOOD_REPORT = {
     TODAY:     "SELECT answer_time FROM 'answers' WHERE questionnaire_type=0 AND question=2 AND "
                "strftime('%Y-%m-%d', datetime(answer_time/1000, 'unixepoch')) = "
                "date(CURRENT_TIMESTAMP) ORDER BY questionnaire_number asc LIMIT 3",
-    YESTERDAY: "SELECT answer_time FROM 'answers' WHERE questionnaire_type=0 AND question=2 AND "
-               "strftime('%Y-%m-%d', datetime(answer_time/1000, 'unixepoch')) = "
-               "date('now','-1 days') ORDER BY questionnaire_number asc LIMIT 3"
+    YESTERDAY: f"SELECT answer_time FROM 'answers' WHERE questionnaire_type=0 AND question=2 AND "
+               f"strftime('%Y-%m-%d', datetime(answer_time/1000, 'unixepoch')) = "
+               f"date('now','-{DAYS_DELTA} days') ORDER BY questionnaire_number asc LIMIT 3"
 }
 
 SQL_QUERY_VIDEO_RECORDING = {
     TODAY:     "SELECT answer_time FROM 'answers' WHERE questionnaire_type=21 AND "
                "strftime('%Y-%m-%d', datetime(answer_time/1000, 'unixepoch')) = "
                "date(CURRENT_TIMESTAMP) ORDER BY questionnaire_number desc LIMIT 1",
-    YESTERDAY: "SELECT * FROM 'answers' WHERE questionnaire_type=21 AND strftime('%Y-%m-%d', "
-               "datetime(answer_time/1000, 'unixepoch')) = date('now','-1 days') ORDER BY "
-               "questionnaire_number desc LIMIT 1"
+    YESTERDAY: f"SELECT * FROM 'answers' WHERE questionnaire_type=21 AND strftime('%Y-%m-%d', "
+               f"datetime(answer_time/1000, 'unixepoch')) = date('now','-{DAYS_DELTA} days') ORDER "
+               f"BY questionnaire_number desc LIMIT 1"
 }
 
 SQL_QUERY_GAMES = {
     TODAY:     "SELECT choice_time,scheduled_time FROM 'trials' WHERE trial=71 AND "
                "strftime('%Y-%m-%d', datetime(choice_time/1000, 'unixepoch')) = date("
                "CURRENT_TIMESTAMP) ORDER BY block DESC LIMIT 4",
-    YESTERDAY: "SELECT choice_time,scheduled_time FROM 'trials' WHERE trial=71 AND "
-               "strftime('%Y-%m-%d', datetime(choice_time/1000, 'unixepoch')) = "
-               "date('now','-1 days') ORDER BY block DESC LIMIT 4"
+    YESTERDAY: f"SELECT choice_time,scheduled_time FROM 'trials' WHERE trial=71 AND "
+               f"strftime('%Y-%m-%d', datetime(choice_time/1000, 'unixepoch')) = "
+               f"date('now','-{DAYS_DELTA} days') ORDER BY block DESC LIMIT 4"
 }
 
 
 class TimesHelper:
+    """
+    This class is in charge of calculating time differences
+    """
+
     def __init__(self):
         self.now = datetime.fromtimestamp(int(time.time()))
 
@@ -108,10 +113,14 @@ class TimesHelper:
 
 
 class DataBaseData:
+    """
+    This class is in charge of managing database file and taking data from it.
+    """
+
     def __init__(self, file_path):
         """
         Initializes data base reader object
-        :param file_path:
+        :param file_path: the path of the database file
         """
         if file_path not in os.listdir(os.getcwd()):
             print(f"No database file have been found. Please make sure the data base file is "
@@ -205,7 +214,7 @@ def generate_analysis_text(db, data_from=TODAY):
     if data_from == TODAY:
         txt = f"DAILY TRACKING ANALYSIS - {datetime.utcnow().date()}\n\n"
     else:
-        txt = f"DAILY TRACKING ANALYSIS - {datetime.utcnow().date() - timedelta(days=1)}\n\n"
+        txt = f"DAILY TRACKING ANALYSIS - {datetime.utcnow().date() - timedelta(days=DAYS_DELTA)}\n\n"
     mood_reports = db.get_mood_reports(data_from)
     sleep_diary = db.get_sleep_diary_reports(data_from)
     games_played = db.get_games_play_report(data_from)
@@ -253,13 +262,15 @@ def main():
     timestamps of the data are in UTC time format.
     :return:
     """
+    if DAYS_DELTA > MAX_EXPERIMENT_DAYS:
+        raise ValueError(f"Specified DAYS_DELTA value {DAYS_DELTA} is bigger than"
+                         f" {MAX_EXPERIMENT_DAYS}")
     db = DataBaseData(DB_FILE_NAME)
     if DATA_FROM_TODAY:
         with open(f"{DB_FILE_NAME}_analysis_{datetime.utcnow().date()}.txt", "w") as output:
             output.write(generate_analysis_text(db, TODAY))
     else:
-        with open(f"{DB_FILE_NAME}_analysis_{datetime.utcnow().date() - timedelta(days=1)}.txt",
-                  "w") as output:
+        with open(f"{DB_FILE_NAME}_analysis_{datetime.utcnow().date() - timedelta(days=DAYS_DELTA)}.txt", "w") as output:
             output.write(generate_analysis_text(db, YESTERDAY))
 
 
