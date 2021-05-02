@@ -14,7 +14,7 @@ import os
 
 DB_FILE_NAME = "2013_schedule.db"  # Put the database file name within the quotation marks
 DATA_FROM_TODAY = False  # Put True if today's data, False if data is from yesterday
-DAYS_DELTA = 10  # number of prior days to take data from
+DAYS_DELTA = 1  # number of prior days to take data from
 
 MAX_EXPERIMENT_DAYS = 12
 MORNING_HOURS = (5, 11)
@@ -24,6 +24,7 @@ MORNING_SESSION = "morning session"
 AFTERNOON_SESSION = "afternoon session"
 EVENING_SESSION = "evening session"
 NO_SESSION = "no session"
+BLOCKS = "blocks"
 REMOVE_MS = 1000  # python cannot handle timestamp with milliseconds, so we need to remove them.
 SECONDS_IN_A_DAY = 86400
 FELL_ASLEEP = "fell asleep"
@@ -60,10 +61,10 @@ SQL_QUERY_VIDEO_RECORDING = {
 }
 
 SQL_QUERY_GAMES = {
-    TODAY:     "SELECT choice_time,scheduled_time FROM 'trials' WHERE trial=71 AND "
+    TODAY:     "SELECT choice_time, scheduled_time, block FROM 'trials' WHERE trial=31 AND "
                "strftime('%Y-%m-%d', datetime(choice_time/1000, 'unixepoch')) = date("
                "CURRENT_TIMESTAMP) ORDER BY block DESC LIMIT 4",
-    YESTERDAY: f"SELECT choice_time,scheduled_time FROM 'trials' WHERE trial=71 AND "
+    YESTERDAY: f"SELECT choice_time, scheduled_time, block FROM 'trials' WHERE trial=31 AND "
                f"strftime('%Y-%m-%d', datetime(choice_time/1000, 'unixepoch')) = "
                f"date('now','-{DAYS_DELTA} days') ORDER BY block DESC LIMIT 4"
 }
@@ -189,8 +190,9 @@ class DataBaseData:
         self.curr.execute(SQL_QUERY_GAMES[to_check])
         times = self.curr.fetchall()
         times = [[x / REMOVE_MS for x in t] for t in times]
-        games_played = {MORNING_SESSION: [], EVENING_SESSION: [], NO_SESSION: []}
+        games_played = {MORNING_SESSION: [], EVENING_SESSION: [], NO_SESSION: [], BLOCKS: []}
         for t in times:
+            games_played[BLOCKS].append(int(t[2] * 1000))  # for some reason it's divided by 1000
             ls = (self.times_helper.convert_timestamp_to_readable(t[0]),
                   self.times_helper.get_time_diff_of_two_timestamps(t[0], t[1]))
             if self.times_helper.is_morning_timestamp(t[0]) and \
@@ -238,6 +240,9 @@ def generate_analysis_text(db, data_from=TODAY):
     else:
         txt += "Has not completed a video recording.\n"
     txt += "\n"
+    blocks = games_played.pop(BLOCKS)
+    if blocks:
+        txt += f"Blocks played: " + ", ".join([str(n) for n in blocks]) + ".\n"
     for session, data in games_played.items():
         if session == NO_SESSION:
             if len(data) >= 1:
