@@ -12,9 +12,9 @@ import time
 import sqlite3
 import os
 
-DB_FILE_NAME = "2013_schedule.db"  # Put the database file name within the quotation marks
+DB_FILE_NAME = "2007_schedule.db"  # Put the database file name within the quotation marks
 DATA_FROM_TODAY = False  # Put True if today's data, False if data is from yesterday
-DAYS_DELTA = 1  # number of prior days to take data from
+DAYS_DELTA = 2  # number of prior days to take data from
 
 MAX_EXPERIMENT_DAYS = 12
 MORNING_HOURS = (5, 11)
@@ -29,6 +29,7 @@ REMOVE_MS = 1000  # python cannot handle timestamp with milliseconds, so we need
 SECONDS_IN_A_DAY = 86400
 FELL_ASLEEP = "fell asleep"
 WOKE_UP = "woke up"
+TIME_FORMAT = "%d-%m-%Y %H:%M:%S"
 
 
 TODAY = "today"
@@ -80,15 +81,27 @@ class TimesHelper:
 
     @staticmethod
     def convert_timestamp_to_readable(timestamp):
-        return datetime.fromtimestamp(int(timestamp)).strftime('%d-%m-%Y %H:%M:%S')
+        """
+        :param timestamp: timestamp
+        :return: a string converted from UTC timestamp to %d-%m-%Y %H:%M:%S
+        """
+        return datetime.fromtimestamp(int(timestamp)).strftime(TIME_FORMAT)
 
     def is_today_timestamp(self, ts):
+        """
+        :param ts: timestamp
+        :return: True if timestamp is from today, else False
+        """
         if self.now.date() != datetime.fromtimestamp(ts).date():
             return False
         return True
 
     @staticmethod
     def is_morning_timestamp(ts):
+        """
+        :param ts: timestamp
+        :return: True if timestamp is considered as a morning hour, else False
+        """
         hour = datetime.fromtimestamp(ts).hour
         if MORNING_HOURS[0] <= hour <= MORNING_HOURS[1]:
             return True
@@ -96,6 +109,10 @@ class TimesHelper:
 
     @staticmethod
     def is_afternoon_timestamp(ts):
+        """
+        :param ts: timestamp
+        :return: True if timestamp is considered as an afternoon hour, else False
+        """
         hour = datetime.fromtimestamp(ts).hour
         if AFTERNOON_HOURS[0] <= hour <= AFTERNOON_HOURS[1]:
             return True
@@ -103,6 +120,10 @@ class TimesHelper:
 
     @staticmethod
     def is_evening_timestamp(ts):
+        """
+        :param ts: timestamp
+        :return: True if timestamp is considered as an evening hour, else False
+        """
         hour = datetime.fromtimestamp(ts).hour
         if EVENING_HOURS[0] <= hour <= EVENING_HOURS[1]:
             return True
@@ -110,7 +131,21 @@ class TimesHelper:
 
     @staticmethod
     def get_time_diff_of_two_timestamps(ts1, ts2):
+        """
+        :param ts1: first timestamp
+        :param ts2: second timestamp
+        :return: time difference of both timestamps
+        """
         return str(datetime.fromtimestamp(int(ts1)) - datetime.fromtimestamp(int(ts2)))
+
+    @staticmethod
+    def get_time_diff_of_two_times(ts1, ts2):
+        """
+        :param ts1: string representing time in format of "%d-%m-%Y %H:%M:%S"
+        :param ts2: string representing time in format of "%d-%m-%Y %H:%M:%S"
+        :return: time difference of both times
+        """
+        return str(abs(datetime.strptime(ts1, TIME_FORMAT) - datetime.strptime(ts2, TIME_FORMAT)))
 
 
 class DataBaseData:
@@ -203,6 +238,7 @@ class DataBaseData:
                 games_played[EVENING_SESSION].append(ls)
             else:
                 games_played[NO_SESSION].append(ls)
+        games_played[BLOCKS].sort()
         return games_played
 
 
@@ -220,44 +256,47 @@ def generate_analysis_text(db, data_from=TODAY):
     mood_reports = db.get_mood_reports(data_from)
     sleep_diary = db.get_sleep_diary_reports(data_from)
     games_played = db.get_games_play_report(data_from)
+    txt += "MOOD REPORTS:\n"
     for session, data in mood_reports.items():
         if session == NO_SESSION:
             if data:
-                txt += f"Some session completed at {data}, but not in scheduled time.\n"
+                txt += f"  Some session completed at {data}, but not in scheduled time.\n"
         elif data:
-            txt += f"Completed {session} mood report at {data}.\n"
+            txt += f"  Completed {session} mood report at {data}.\n"
         else:
-            txt += f"Has not completed {session} mood report.\n"
-    txt += "\n"
+            txt += f"  Has not completed {session} mood report.\n"
+    txt += "\nSLEEP DIARY:\n"
     if sleep_diary:
         for action, data in sleep_diary.items():
-            txt += f"{action} at {data}.\n"
+            txt += f"  {action} at {data}.\n"
     else:
-        txt += "No sleeping data added.\n"
-    txt += "\n"
+        txt += "  No sleeping data added.\n"
+    txt += "\nVIDEO RECORDINGS:\n"
     if db.has_recorded_video_recording(data_from):
-        txt += "Has completed a video recording.\n"
+        txt += "  Has completed a video recording.\n"
     else:
-        txt += "Has not completed a video recording.\n"
-    txt += "\n"
+        txt += "  Has not completed a video recording.\n"
+    txt += "\nGAMES PERFORMANCE:\n"
     blocks = games_played.pop(BLOCKS)
     if blocks:
-        txt += f"Blocks played: " + ", ".join([str(n) for n in blocks]) + ".\n"
+        txt += f"  Blocks played: " + ", ".join([str(n) for n in blocks]) + ".\n"
     for session, data in games_played.items():
         if session == NO_SESSION:
             if len(data) >= 1:
                 for i in range(len(data)):
-                    txt += f"Has completed a game but not in time, at {data[i][0]} with delay of " \
-                           f"{data[i][1]}.\n"
+                    txt += f"  Has completed a game but not in time, at {data[i][0]} with delay " \
+                           f"of {data[i][1]}.\n"
         elif data and len(data) >= 1:
-            txt += f"Has completed {session} game at {data[0][0]} with delay of {data[0][1]}.\n"
+            txt += f"  Has completed {session} game at {data[0][0]} with delay of {data[0][1]}.\n"
             if len(data) >= 2:
-                txt += f"Has completed another {session} game at {data[1][0]} with delay of " \
+                txt += f"  Has completed another {session} game at {data[1][0]} with delay of " \
                        f"{data[1][1]}.\n"
+                txt += f"  * Time difference between first and second {session} games is " \
+                       f"{TimesHelper.get_time_diff_of_two_times(data[0][0], data[1][0])}.\n"
             else:
-                txt += f"Has not completed the second game of the {session}.\n"
+                txt += f"  Has not completed the second game of the {session}.\n"
         else:
-            txt += f"No games of the {session} have been completed.\n"
+            txt += f"  No games of the {session} have been completed.\n"
     return txt
 
 
