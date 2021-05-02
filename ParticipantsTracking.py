@@ -14,7 +14,7 @@ import os
 
 DB_FILE_NAME = "2007_schedule.db"  # Put the database file name within the quotation marks
 DATA_FROM_TODAY = False  # Put True if today's data, False if data is from yesterday
-DAYS_DELTA = 2  # number of prior days to take data from
+DAYS_DELTA = 1  # number of prior days to take data from
 
 MAX_EXPERIMENT_DAYS = 12
 MORNING_HOURS = (5, 11)
