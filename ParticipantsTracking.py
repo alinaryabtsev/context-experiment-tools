@@ -158,7 +158,7 @@ class DataBaseData:
         Initializes data base reader object
         :param file_path: the path of the database file
         """
-        if os.path.exists(file_path):
+        if not os.path.exists(file_path):
             print(f"No database file have been found. Please make sure the data base file is "
                   f"named as {file_path} and can be found where the script is.")
             sys.exit()
